@@ -21,8 +21,8 @@ use self::program_header::ProgramHeader;
 mod section_header;
 use self::section_header::SectionHeader;
 
-mod symbol_table;
-use self::symbol_table::SymbolTable;
+mod symbol;
+use self::symbol::Symbol;
 
 const ELF_MAGIC: [u8; 4] = [0x7F, 0x45, 0x4c, 0x46];
 
@@ -93,7 +93,7 @@ impl <B: ElfBitwidth> Elf<B> {
         2 * ptr_size + 8
     }
 
-    pub fn symtab_tables(&self, inp: &[u8]) -> Result<Option<Vec<SymbolTable<B>>>, ElfParseError> {
+    pub fn symbols(&self, inp: &[u8]) -> Result<Option<Vec<Symbol<B>>>, ElfParseError> {
         let symtab_index = if let Some(stidx) = self.symtab_index() {
             stidx
         } else {
@@ -116,7 +116,7 @@ impl <B: ElfBitwidth> Elf<B> {
 
             let bytes = &inp[base_offset + relative_offset..];
 
-            let symbol_table = SymbolTable::parse(bytes, self.header.endianness)?;
+            let symbol_table = Symbol::parse(bytes, self.header.endianness)?;
 
             symbol_tables.push(symbol_table);
         }

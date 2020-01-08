@@ -8,7 +8,7 @@ use super::ElfParseError;
 use super::Elf;
 
 #[derive(Debug, Clone)]
-pub struct SymbolTable<B: ElfBitwidth> {
+pub struct Symbol<B: ElfBitwidth> {
     _bitwidth: PhantomData<B>,
 
     name_strtab_offset: usize,
@@ -19,8 +19,8 @@ pub struct SymbolTable<B: ElfBitwidth> {
     section_header_index: usize,
 }
 
-impl <B: ElfBitwidth> SymbolTable<B> {
-    pub fn parse(inp: &[u8], endianness: Endianness) -> Result<SymbolTable<B>, ElfParseError> {
+impl <B: ElfBitwidth> Symbol<B> {
+    pub fn parse(inp: &[u8], endianness: Endianness) -> Result<Symbol<B>, ElfParseError> {
         let mut at = 0;
         let name_strtab_offset = endianness.read_u32(&inp[at..]) as usize;
         at += 4;
@@ -41,7 +41,7 @@ impl <B: ElfBitwidth> SymbolTable<B> {
 
             let section_header_index = endianness.read_u16(&inp[at..]) as usize;
 
-            Ok(SymbolTable {
+            Ok(Symbol {
                 _bitwidth: PhantomData,
                 name_strtab_offset,
                 value,
@@ -66,7 +66,7 @@ impl <B: ElfBitwidth> SymbolTable<B> {
 
             let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]).to_usize();
 
-            Ok(SymbolTable {
+            Ok(Symbol {
                 _bitwidth: PhantomData,
                 name_strtab_offset,
                 value,
