@@ -35,4 +35,31 @@ impl Endianness {
             Endianness::BigEndian => u64::from_be_bytes(read_bytes),
         }
     }
+
+    #[allow(unused)]
+    pub fn read_i16(&self, bytes: &[u8]) -> i16 {
+        let read_bytes = bytes[0..2].try_into().unwrap();
+        match *self {
+            Endianness::LittleEndian => i16::from_le_bytes(read_bytes),
+            Endianness::BigEndian => i16::from_be_bytes(read_bytes),
+        }
+    }
+
+    #[allow(unused)]
+    pub fn read_i32(&self, bytes: &[u8]) -> i32 {
+        let read_bytes = bytes[0..4].try_into().unwrap();
+        match *self {
+            Endianness::LittleEndian => i32::from_le_bytes(read_bytes),
+            Endianness::BigEndian => i32::from_be_bytes(read_bytes),
+        }
+    }
+
+    #[allow(unused)]
+    pub fn read_i64(&self, bytes: &[u8]) -> i64 {
+        let read_bytes = bytes[0..8].try_into().unwrap();
+        match *self {
+            Endianness::LittleEndian => i64::from_le_bytes(read_bytes),
+            Endianness::BigEndian => i64::from_be_bytes(read_bytes),
+        }
+    }
 }
