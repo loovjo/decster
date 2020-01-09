@@ -1,7 +1,7 @@
 use crate::instruction_set::InstructionSet;
 use super::error::ElfParseError;
 
-pub fn instruction_set_from_u8(value: u8) -> Result<InstructionSet, ElfParseError> {
+pub fn instruction_set_from_u16(value: u16) -> Result<InstructionSet, ElfParseError> {
     use InstructionSet::*;
     match value {
         0x00 => Ok(NotSpecified),
@@ -16,6 +16,6 @@ pub fn instruction_set_from_u8(value: u8) -> Result<InstructionSet, ElfParseErro
         0x3E => Ok(X86_64),
         0xB7 => Ok(AArch64),
         0xF3 => Ok(RISC_V),
-        _ => Err(ElfParseError::UnknownInstructionSet([value])),
+        _ => Err(ElfParseError::UnknownInstructionSet(value)),
     }
 }

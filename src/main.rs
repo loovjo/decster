@@ -12,6 +12,9 @@ mod instruction_set;
 
 mod elf;
 
+mod parsable_file;
+use parsable_file::ParsableFile;
+
 fn main() {
     let path = args().skip(1).next();
     let path = path.unwrap_or("example_binaries/hello_elf.bin".to_string());
@@ -28,7 +31,7 @@ fn main() {
         eprintln!("Could not read file {}, error {}", path, e);
         return;
     }
-    let contents = &*contents;
+    let contents = ParsableFile::new(&*contents);
 
     let mut parsed = None;
     match handle_elf_64bit(contents) {
@@ -47,25 +50,25 @@ fn main() {
     }
 }
 
-fn handle_elf_64bit(contents: &[u8]) -> Result<impl common::ParsedExecutable, elf::ElfParseError> {
-    let elf = elf::Elf::<bits::SixtyfourBit>::parse(contents)?;
+fn handle_elf_64bit(mut contents: ParsableFile<'_>) -> Result<impl common::ParsedExecutable, elf::ElfParseError> {
+    let elf = elf::Elf::<bits::SixtyfourBit>::parse(&mut contents)?;
     println!("Parsed elf: {:#X?}", elf);
 
     for (i, section_header) in elf.section_headers.iter().enumerate() {
         println!("Section header #{}: {:X?}", i, section_header);
-        println!("Name: {:?}", String::from_utf8_lossy(section_header.get_name(contents, &elf)?));
+        println!("Name: {:?}", String::from_utf8_lossy(section_header.get_name(&mut contents, &elf)?));
         if section_header.size < 32 {
-            println!("Content: {:?}", String::from_utf8_lossy(section_header.get_content(contents)?));
+            println!("Content: {:?}", String::from_utf8_lossy(section_header.get_content(&mut contents)?));
         }
         println!();
 
     }
 
-    match elf.symbols(contents)? {
+    match elf.symbols(&mut contents)? {
         Some(symbols) => {
             for symbol in symbols {
                 println!("Symbol: {:X?}", symbol);
-                println!("Name: {:?}", symbol.get_name(contents, &elf)?.map(String::from_utf8_lossy));
+                println!("Name: {:?}", symbol.get_name(&mut contents, &elf)?.map(String::from_utf8_lossy));
                 println!();
             }
         }
@@ -73,6 +76,10 @@ fn handle_elf_64bit(contents: &[u8]) -> Result<impl common::ParsedExecutable, el
             eprintln!("No symbols found :(");
         }
     }
+
+    // for relocation in elf.relocations()? {
+    //     println!("Relocation: {:?}", relocation);
+    // }
 
     Ok(elf)
 }

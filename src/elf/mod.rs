@@ -1,6 +1,7 @@
 use crate::bits::{PtrType, Bitwidth};
 use crate::common::ParsedExecutable;
 use crate::instruction_set::InstructionSet;
+use crate::parsable_file::ParsableFile;
 
 mod error;
 pub use self::error::ElfParseError;
@@ -45,9 +46,10 @@ impl <B: ElfBitwidth> ParsedExecutable for Elf<B> {
 
 
 impl <B: ElfBitwidth> Elf<B> {
-    pub fn parse(inp: &[u8]) -> Result<Elf<B>, ElfParseError> {
-        if inp[0..4] != ELF_MAGIC {
-            return Err(ElfParseError::WrongMagic([ inp[0], inp[1], inp[2], inp[3] ]))
+    pub fn parse(inp: &mut ParsableFile<'_>) -> Result<Elf<B>, ElfParseError> {
+        let magic = inp.read_n_bytes(4)?;
+        if magic != &ELF_MAGIC {
+            return Err(ElfParseError::WrongMagic(magic.to_vec()))
         }
 
         let header = Header::<B>::parse(inp)?;
@@ -55,24 +57,23 @@ impl <B: ElfBitwidth> Elf<B> {
         // Read program headers
         let mut program_headers = Vec::with_capacity(header.program_header_n_entries as usize);
 
-        for program_header_idx in 0..header.program_header_n_entries {
-            let base_offset = header.program_header_offset.to_usize()?;
-            let relative_offset = program_header_idx as usize * header.program_header_entry_size as usize;
+        let mut inp_for_ph = inp.clone();
+        inp_for_ph.move_to(header.program_header_offset.to_usize()?);
 
-            let bytes = &inp[base_offset + relative_offset..];
-            let program_header = ProgramHeader::parse(bytes, header.endianness)?;
+        for _ in 0..header.program_header_n_entries {
+            let program_header = ProgramHeader::parse(&mut inp_for_ph, header.endianness)?;
 
             program_headers.push(program_header);
         }
 
         // Read section headers
         let mut section_headers = Vec::with_capacity(header.section_header_n_entries as usize);
-        for section_header_idx in 0..header.section_header_n_entries {
-            let base_offset = header.section_header_offset.to_usize()?;
-            let relative_offset = section_header_idx as usize * header.section_header_entry_size as usize;
 
-            let bytes = &inp[base_offset + relative_offset..];
-            let section_header = SectionHeader::parse(bytes, header.endianness)?;
+        let mut inp_for_sh = inp.clone();
+        inp_for_sh.move_to(header.section_header_offset.to_usize()?);
+
+        for _ in 0..header.section_header_n_entries {
+            let section_header = SectionHeader::parse(&mut inp_for_sh, header.endianness)?;
 
             section_headers.push(section_header);
         }
@@ -96,7 +97,7 @@ impl <B: ElfBitwidth> Elf<B> {
         2 * ptr_size + 8
     }
 
-    pub fn symbols(&self, inp: &[u8]) -> Result<Option<Vec<Symbol<B>>>, ElfParseError> {
+    pub fn symbols(&self, inp: &mut ParsableFile<'_>) -> Result<Option<Vec<Symbol<B>>>, ElfParseError> {
         let symtab_index = if let Some(stidx) = self.symtab_index() {
             stidx
         } else {
@@ -113,13 +114,11 @@ impl <B: ElfBitwidth> Elf<B> {
 
         let mut symbol_tables = Vec::with_capacity(n_symbol_tables);
 
-        for symbol_table_idx in 0..n_symbol_tables {
-            let base_offset = symtab_header.file_offset.to_usize()?;
-            let relative_offset = symbol_table_idx * self.symtab_entry_size();
+        let mut inp_for_symbol_table = inp.clone();
+        inp_for_symbol_table.move_to(symtab_header.file_offset.to_usize()?);
 
-            let bytes = &inp[base_offset + relative_offset..];
-
-            let symbol_table = Symbol::parse(bytes, self.header.endianness)?;
+        for _ in 0..n_symbol_tables {
+            let symbol_table = Symbol::parse(&mut inp_for_symbol_table, self.header.endianness)?;
 
             symbol_tables.push(symbol_table);
         }
@@ -132,13 +131,13 @@ impl <B: ElfBitwidth> Elf<B> {
         self.section_headers
             .iter()
             .enumerate()
-            .filter(|(i, x)| x.type_ == SectionHeaderType::Rel || x.type_ == SectionHeaderType::Rela)
-            .map(|(i, x)| i)
+            .filter(|(_i, x)| x.type_ == SectionHeaderType::Rel || x.type_ == SectionHeaderType::Rela)
+            .map(|(i, _x)| i)
             .collect()
     }
 
     pub fn relocations(&self) -> Result<Vec<Relocation<B>>, ElfParseError> {
-        let reloc_tables = self.reloc_tables_inds().iter().map(|i| &self.section_headers[*i]);
+        let _reloc_tables = self.reloc_tables_inds().iter().map(|i| &self.section_headers[*i]);
 
         // TODO Implement this!
 

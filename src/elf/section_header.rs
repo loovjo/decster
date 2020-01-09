@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use crate::bits::{Bitwidth, PtrType};
 use crate::endian::Endianness;
+use crate::parsable_file::ParsableFile;
 
 use super::elf_bitwidth::ElfBitwidth;
 use super::ElfParseError;
@@ -22,25 +23,31 @@ pub struct SectionHeader<B: ElfBitwidth> {
 }
 
 impl <B: ElfBitwidth> SectionHeader<B> {
-    pub fn parse(inp: &[u8], endianness: Endianness) -> Result<SectionHeader<B>, ElfParseError> {
-        let mut at = 0x0;
+    pub fn parse(inp: &mut ParsableFile<'_>, endianness: Endianness) -> Result<SectionHeader<B>, ElfParseError> {
+        let shstrtab_offset = endianness.read_u32(inp)? as usize;
 
-        let shstrtab_offset = endianness.read_u32(&inp[at..])? as usize;
-        at += 4;
-
-        let type_ = SectionHeaderType::from_u32(endianness.read_u32(&inp[at..])?);
-        at += 4;
+        let type_ = SectionHeaderType::from_u32(endianness.read_u32(inp)?);
 
         // TODO: sh_flags
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let virtual_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let virtual_address = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let file_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let file_offset = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
+        let size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
+
+        // Skip sh_link
+        inp.skip_n_bytes(4)?;
+
+        // Skip sh_info
+        inp.skip_n_bytes(4)?;
+
+        // Skip sh_addralign
+        inp.skip_n_bytes(<B as Bitwidth>::Ptr::N_BYTES)?;
+
+        // Skip sh_entsize
+        inp.skip_n_bytes(<B as Bitwidth>::Ptr::N_BYTES)?;
 
         Ok(SectionHeader {
             _bitwidth: PhantomData,
@@ -52,11 +59,13 @@ impl <B: ElfBitwidth> SectionHeader<B> {
         })
     }
 
-    pub fn get_content<'a>(&self, bytes: &'a [u8]) -> Result<&'a [u8], ElfParseError> {
-        Ok(&bytes[self.file_offset.to_usize()?..self.file_offset.to_usize()? + self.size.to_usize()?])
+    pub fn get_content<'a>(&self, bytes: &mut ParsableFile<'a>) -> Result<&'a [u8], ElfParseError> {
+        let mut bytes_r = bytes.clone();
+        bytes_r.move_to(self.file_offset.to_usize()?);
+        Ok(bytes_r.read_n_bytes(self.size.to_usize()?)?)
     }
 
-    pub fn get_name<'a>(&self, bytes: &'a [u8], elf: &Elf<B>) -> Result<&'a [u8], ElfParseError> {
+    pub fn get_name<'a>(&self, bytes: &mut ParsableFile<'a>, elf: &Elf<B>) -> Result<&'a [u8], ElfParseError> {
         let section_header_shstrtab = &elf.section_headers[elf.header.section_header_shstrtab_index];
 
         let shstrtab = section_header_shstrtab.get_content(bytes)?;

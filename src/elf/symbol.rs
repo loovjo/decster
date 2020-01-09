@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use crate::bits::{Bitwidth, PtrType};
 use crate::endian::Endianness;
+use crate::parsable_file::ParsableFile;
 
 use super::elf_bitwidth::ElfBitwidth;
 use super::ElfParseError;
@@ -20,26 +21,20 @@ pub struct Symbol<B: ElfBitwidth> {
 }
 
 impl <B: ElfBitwidth> Symbol<B> {
-    pub fn parse(inp: &[u8], endianness: Endianness) -> Result<Symbol<B>, ElfParseError> {
-        let mut at = 0;
-        let name_strtab_offset = endianness.read_u32(&inp[at..])? as usize;
-        at += 4;
+    pub fn parse(inp: &mut ParsableFile<'_>, endianness: Endianness) -> Result<Symbol<B>, ElfParseError> {
+        let name_strtab_offset = endianness.read_u32(inp)? as usize;
 
         // The layout is completely different for 32 and 64 bits
         if <B as Bitwidth>::Ptr::N_BYTES == 4 {
-            let value = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-            at += <B as Bitwidth>::Ptr::N_BYTES;
+            let value = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-            let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-            at += <B as Bitwidth>::Ptr::N_BYTES;
+            let size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-            let info = inp[at];
-            at += 1;
+            let info = endianness.read_u8(inp)?;
 
-            let other = inp[at];
-            at += 1;
+            let other = endianness.read_u8(inp)?;
 
-            let section_header_index = endianness.read_u16(&inp[at..])? as usize;
+            let section_header_index = endianness.read_u16(inp)? as usize;
 
             Ok(Symbol {
                 _bitwidth: PhantomData,
@@ -52,19 +47,15 @@ impl <B: ElfBitwidth> Symbol<B> {
             })
         } else {
             // 64 bit
-            let info = inp[at];
-            at += 1;
+            let info = endianness.read_u8(inp)?;
 
-            let other = inp[at];
-            at += 1;
+            let other = endianness.read_u8(inp)?;
 
-            let section_header_index = endianness.read_u16(&inp[at..])? as usize;
-            at += 2;
+            let section_header_index = endianness.read_u16(inp)? as usize;
 
-            let value = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-            at += <B as Bitwidth>::Ptr::N_BYTES;
+            let value = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-            let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
+            let size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
             Ok(Symbol {
                 _bitwidth: PhantomData,
@@ -79,7 +70,7 @@ impl <B: ElfBitwidth> Symbol<B> {
         }
     }
 
-    pub fn get_name<'a>(&self, bytes: &'a [u8], elf: &Elf<B>) -> Result<Option<&'a [u8]>, ElfParseError> {
+    pub fn get_name<'a>(&self, bytes: &mut ParsableFile<'a>, elf: &Elf<B>) -> Result<Option<&'a [u8]>, ElfParseError> {
         let mut strtab_header = None;
         for section_header in &elf.section_headers {
             let name = section_header.get_name(bytes, elf)?;

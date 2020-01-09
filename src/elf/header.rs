@@ -3,10 +3,11 @@ use std::marker::PhantomData;
 use crate::bits::{Bitwidth, PtrType};
 use crate::endian::Endianness;
 use crate::instruction_set::InstructionSet;
+use crate::parsable_file::ParsableFile;
 
 use super::elf_bitwidth::ElfBitwidth;
 use super::osabi::OsABI;
-use super::elf_instruction_set::instruction_set_from_u8;
+use super::elf_instruction_set::instruction_set_from_u16;
 use super::ElfParseError;
 use super::object_type::ObjectType;
 
@@ -30,61 +31,58 @@ pub struct Header<B: ElfBitwidth> {
 }
 
 impl <B: ElfBitwidth> Header<B> {
-    pub fn parse(inp: &[u8]) -> Result<Header<B>, ElfParseError> {
-        let bitwidth_marker = inp[0x04];
+    pub fn parse(inp: &mut ParsableFile<'_>) -> Result<Header<B>, ElfParseError> {
+        let bitwidth_marker = inp.read_n_bytes(1)?[0];
         if bitwidth_marker != B::MARKER {
-            return Err(ElfParseError::WrongBitwidth([bitwidth_marker]))
+            return Err(ElfParseError::WrongBitwidth(bitwidth_marker))
         }
 
-        let endianness = match inp[0x05] {
+        let endianness_marker = inp.read_n_bytes(1)?[0];
+        let endianness = match endianness_marker {
             1 => Endianness::LittleEndian,
             2 => Endianness::BigEndian,
-            _ => return Err(ElfParseError::WrongEndianness([inp[0x05]]))
+            _ => return Err(ElfParseError::WrongEndianness(endianness_marker))
         };
 
-        // Maybe check EI_VERSION?
+        // Skip version
 
-        let abi = OsABI::from_u8(inp[0x07])?;
+        inp.skip_n_bytes(1)?;
 
-        let abi_version = inp[0x08];
+        let abi = OsABI::from_u8(endianness.read_u8(inp)?)?;
 
-        let object_type = ObjectType::from_u16(endianness.read_u16(&inp[0x10..])?)?;
+        let abi_version = endianness.read_u8(inp)?;
 
-        let instruction_set = instruction_set_from_u8(inp[0x12])?;
+        // Skip padding
+        inp.skip_n_bytes(7)?;
+
+        let object_type = ObjectType::from_u16(endianness.read_u16(inp)?)?;
+
+        let instruction_set = instruction_set_from_u16(endianness.read_u16(inp)?)?;
 
         // Maybe check e_version?
+        inp.skip_n_bytes(4)?;
 
-        let mut at = 0x18;
+        let entry_offset = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let entry_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let program_header_offset = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        // TODO: Clean this up!
-        // Preferably, we would alias some type to <B as Bitwidth>::Ptr, but this is wierd at the moment.
-        let program_header_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
-
-        let section_header_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let section_header_offset = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
         // Skip e_flags
-        at += 4;
-        // Skip eh_size
-        at += 2;
+        inp.skip_n_bytes(4)?;
 
-        let program_header_entry_size = endianness.read_u16(&inp[at..])?;
-        at += 2;
+        // Skip e_ehsize
+        inp.skip_n_bytes(2)?;
 
-        let program_header_n_entries = endianness.read_u16(&inp[at..])?;
-        at += 2;
+        let program_header_entry_size = endianness.read_u16(inp)?;
 
-        let section_header_entry_size = endianness.read_u16(&inp[at..])?;
-        at += 2;
+        let program_header_n_entries = endianness.read_u16(inp)?;
 
-        let section_header_n_entries = endianness.read_u16(&inp[at..])?;
-        at += 2;
+        let section_header_entry_size = endianness.read_u16(inp)?;
 
-        let section_header_shstrtab_index = endianness.read_u16(&inp[at..])? as usize;
+        let section_header_n_entries = endianness.read_u16(inp)?;
+
+        let section_header_shstrtab_index = endianness.read_u16(inp)? as usize;
 
         Ok(Header {
             _bitwidth: PhantomData,

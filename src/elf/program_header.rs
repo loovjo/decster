@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use crate::bits::{Bitwidth, PtrType};
 use crate::endian::Endianness;
+use crate::parsable_file::ParsableFile;
 
 use super::elf_bitwidth::ElfBitwidth;
 use super::ElfParseError;
@@ -21,27 +22,31 @@ pub struct ProgramHeader<B: ElfBitwidth> {
 }
 
 impl <B: ElfBitwidth> ProgramHeader<B> {
-    pub fn parse(inp: &[u8], endianness: Endianness) -> Result<ProgramHeader<B>, ElfParseError> {
-        let mut at = 0;
-        let type_ = ProgramHeaderType::from_u32(endianness.read_u32(&inp)?);
-        at += 4;
+    pub fn parse(inp: &mut ParsableFile<'_>, endianness: Endianness) -> Result<ProgramHeader<B>, ElfParseError> {
+        let type_ = ProgramHeaderType::from_u32(endianness.read_u32(inp)?);
 
-        // Skip p_flags
-        at += 4;
+        if <B as Bitwidth>::Ptr::N_BYTES == 8 {
+            // Skip p_flags
+            inp.skip_n_bytes(4)?;
+        }
 
-        let file_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let file_offset = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let virtual_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let virtual_address = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let physical_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let physical_address = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
-        at += <B as Bitwidth>::Ptr::N_BYTES;
+        let size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        let memory_size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
+        let memory_size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
+
+        if <B as Bitwidth>::Ptr::N_BYTES == 4 {
+            // Skip p_flags
+            inp.skip_n_bytes(4)?;
+        }
+
+        // Skip p_align
+        inp.skip_n_bytes(<B as Bitwidth>::Ptr::N_BYTES)?;
 
         Ok(ProgramHeader {
             _bitwidth: PhantomData,
@@ -54,8 +59,11 @@ impl <B: ElfBitwidth> ProgramHeader<B> {
         })
     }
 
-    pub fn get_content<'a>(&self, bytes: &'a [u8]) -> Result<&'a [u8], ElfParseError> {
-        Ok(&bytes[self.file_offset.to_usize()?..self.file_offset.to_usize()? + self.size.to_usize()?])
+    pub fn get_content<'a>(&self, bytes: &mut ParsableFile<'a>) -> Result<&'a [u8], ElfParseError> {
+        let mut bytes_pf: ParsableFile<'a> = bytes.clone();
+        bytes_pf.move_to(self.file_offset.to_usize()?);
+
+        Ok(bytes_pf.read_n_bytes(self.size.to_usize()?)?)
     }
 }
 

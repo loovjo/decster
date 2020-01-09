@@ -1,13 +1,13 @@
 use crate::error::GenericParseError;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ElfParseError {
     Generic(GenericParseError),
-    WrongMagic([u8; 4]),
-    WrongBitwidth([u8; 1]),
-    WrongEndianness([u8; 1]),
+    WrongMagic(Vec<u8>),
+    WrongBitwidth(u8),
+    WrongEndianness(u8),
     UnknownOsABI([u8; 1]),
-    UnknownInstructionSet([u8; 1]),
+    UnknownInstructionSet(u16),
     UnknownObjectType(u16),
 }
 
