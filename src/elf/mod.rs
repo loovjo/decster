@@ -19,10 +19,13 @@ mod program_header;
 use self::program_header::ProgramHeader;
 
 mod section_header;
-use self::section_header::SectionHeader;
+use self::section_header::{SectionHeader, SectionHeaderType};
 
 mod symbol;
 use self::symbol::Symbol;
+
+mod reloc;
+use reloc::Relocation;
 
 const ELF_MAGIC: [u8; 4] = [0x7F, 0x45, 0x4c, 0x46];
 
@@ -84,7 +87,7 @@ impl <B: ElfBitwidth> Elf<B> {
     pub fn symtab_index(&self) -> Option<usize> {
         self.section_headers
             .iter()
-            .position(|x| x.type_ == section_header::SectionHeaderType::SymTab)
+            .position(|x| x.type_ == SectionHeaderType::SymTab)
     }
 
     #[inline(always)]
@@ -122,6 +125,24 @@ impl <B: ElfBitwidth> Elf<B> {
         }
 
         Ok(Some(symbol_tables))
+    }
+
+    // Maybe we should make this function return the sections?
+    pub fn reloc_tables_inds(&self) -> Vec<usize> {
+        self.section_headers
+            .iter()
+            .enumerate()
+            .filter(|(i, x)| x.type_ == SectionHeaderType::Rel || x.type_ == SectionHeaderType::Rela)
+            .map(|(i, x)| i)
+            .collect()
+    }
+
+    pub fn relocations(&self) -> Result<Vec<Relocation<B>>, ElfParseError> {
+        let reloc_tables = self.reloc_tables_inds().iter().map(|i| &self.section_headers[*i]);
+
+        // TODO Implement this!
+
+        unimplemented!()
     }
 }
 
