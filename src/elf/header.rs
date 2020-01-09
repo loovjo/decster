@@ -48,7 +48,7 @@ impl <B: ElfBitwidth> Header<B> {
 
         let abi_version = inp[0x08];
 
-        let object_type = ObjectType::from_u16(endianness.read_u16(&inp[0x10..]))?;
+        let object_type = ObjectType::from_u16(endianness.read_u16(&inp[0x10..])?)?;
 
         let instruction_set = instruction_set_from_u8(inp[0x12])?;
 
@@ -56,15 +56,15 @@ impl <B: ElfBitwidth> Header<B> {
 
         let mut at = 0x18;
 
-        let entry_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let entry_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
         // TODO: Clean this up!
         // Preferably, we would alias some type to <B as Bitwidth>::Ptr, but this is wierd at the moment.
-        let program_header_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let program_header_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
-        let section_header_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let section_header_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
         // Skip e_flags
@@ -72,19 +72,19 @@ impl <B: ElfBitwidth> Header<B> {
         // Skip eh_size
         at += 2;
 
-        let program_header_entry_size = endianness.read_u16(&inp[at..]);
+        let program_header_entry_size = endianness.read_u16(&inp[at..])?;
         at += 2;
 
-        let program_header_n_entries = endianness.read_u16(&inp[at..]);
+        let program_header_n_entries = endianness.read_u16(&inp[at..])?;
         at += 2;
 
-        let section_header_entry_size = endianness.read_u16(&inp[at..]);
+        let section_header_entry_size = endianness.read_u16(&inp[at..])?;
         at += 2;
 
-        let section_header_n_entries = endianness.read_u16(&inp[at..]);
+        let section_header_n_entries = endianness.read_u16(&inp[at..])?;
         at += 2;
 
-        let section_header_shstrtab_index = endianness.read_u16(&inp[at..]) as usize;
+        let section_header_shstrtab_index = endianness.read_u16(&inp[at..])? as usize;
 
         Ok(Header {
             _bitwidth: PhantomData,

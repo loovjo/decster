@@ -23,25 +23,25 @@ pub struct ProgramHeader<B: ElfBitwidth> {
 impl <B: ElfBitwidth> ProgramHeader<B> {
     pub fn parse(inp: &[u8], endianness: Endianness) -> Result<ProgramHeader<B>, ElfParseError> {
         let mut at = 0;
-        let type_ = ProgramHeaderType::from_u32(endianness.read_u32(&inp));
+        let type_ = ProgramHeaderType::from_u32(endianness.read_u32(&inp)?);
         at += 4;
 
         // Skip p_flags
         at += 4;
 
-        let file_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let file_offset = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
-        let virtual_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let virtual_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
-        let physical_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let physical_address = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
-        let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
         at += <B as Bitwidth>::Ptr::N_BYTES;
 
-        let memory_size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+        let memory_size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
 
         Ok(ProgramHeader {
             _bitwidth: PhantomData,
@@ -54,8 +54,8 @@ impl <B: ElfBitwidth> ProgramHeader<B> {
         })
     }
 
-    pub fn get_content<'a>(&self, bytes: &'a [u8]) -> &'a [u8] {
-        &bytes[self.file_offset.to_usize()..self.file_offset.to_usize() + self.size.to_usize()]
+    pub fn get_content<'a>(&self, bytes: &'a [u8]) -> Result<&'a [u8], ElfParseError> {
+        Ok(&bytes[self.file_offset.to_usize()?..self.file_offset.to_usize()? + self.size.to_usize()?])
     }
 }
 

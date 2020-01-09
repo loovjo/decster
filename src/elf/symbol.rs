@@ -13,7 +13,7 @@ pub struct Symbol<B: ElfBitwidth> {
 
     name_strtab_offset: usize,
     value: <B as Bitwidth>::Ptr,
-    size: usize,
+    size: <B as Bitwidth>::Ptr,
     info: u8,
     other: u8,
     section_header_index: usize,
@@ -22,15 +22,15 @@ pub struct Symbol<B: ElfBitwidth> {
 impl <B: ElfBitwidth> Symbol<B> {
     pub fn parse(inp: &[u8], endianness: Endianness) -> Result<Symbol<B>, ElfParseError> {
         let mut at = 0;
-        let name_strtab_offset = endianness.read_u32(&inp[at..]) as usize;
+        let name_strtab_offset = endianness.read_u32(&inp[at..])? as usize;
         at += 4;
 
         // The layout is completely different for 32 and 64 bits
         if <B as Bitwidth>::Ptr::N_BYTES == 4 {
-            let value = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+            let value = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
             at += <B as Bitwidth>::Ptr::N_BYTES;
 
-            let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]).to_usize();
+            let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
             at += <B as Bitwidth>::Ptr::N_BYTES;
 
             let info = inp[at];
@@ -39,7 +39,7 @@ impl <B: ElfBitwidth> Symbol<B> {
             let other = inp[at];
             at += 1;
 
-            let section_header_index = endianness.read_u16(&inp[at..]) as usize;
+            let section_header_index = endianness.read_u16(&inp[at..])? as usize;
 
             Ok(Symbol {
                 _bitwidth: PhantomData,
@@ -58,13 +58,13 @@ impl <B: ElfBitwidth> Symbol<B> {
             let other = inp[at];
             at += 1;
 
-            let section_header_index = endianness.read_u16(&inp[at..]) as usize;
+            let section_header_index = endianness.read_u16(&inp[at..])? as usize;
             at += 2;
 
-            let value = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]);
+            let value = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
             at += <B as Bitwidth>::Ptr::N_BYTES;
 
-            let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..]).to_usize();
+            let size = <B as Bitwidth>::Ptr::read(endianness, &inp[at..])?;
 
             Ok(Symbol {
                 _bitwidth: PhantomData,
@@ -79,15 +79,22 @@ impl <B: ElfBitwidth> Symbol<B> {
         }
     }
 
-    pub fn get_name<'a>(&self, bytes: &'a [u8], elf: &Elf<B>) -> Option<&'a [u8]> {
-        let strtab_header = elf.section_headers
-            .iter()
-            .find(|x| {
-                let name = x.get_name(bytes, elf);
-                name == b".strtab"
-            })?;
+    pub fn get_name<'a>(&self, bytes: &'a [u8], elf: &Elf<B>) -> Result<Option<&'a [u8]>, ElfParseError> {
+        let mut strtab_header = None;
+        for section_header in &elf.section_headers {
+            let name = section_header.get_name(bytes, elf)?;
+            if name == b".strtab" {
+                strtab_header = Some(section_header);
+            }
+        }
 
-        let strtab = strtab_header.get_content(bytes);
+        let strtab_header = if let Some(strtab_header) = strtab_header {
+            strtab_header
+        } else {
+            return Ok(None);
+        };
+
+        let strtab = strtab_header.get_content(bytes)?;
         let name_start = &strtab[self.name_strtab_offset..];
 
         let mut end = 0;
@@ -95,7 +102,7 @@ impl <B: ElfBitwidth> Symbol<B> {
             end += 1;
         }
 
-        Some(&name_start[..end])
+        Ok(Some(&name_start[..end]))
     }
 
 }

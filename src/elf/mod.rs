@@ -53,7 +53,7 @@ impl <B: ElfBitwidth> Elf<B> {
         let mut program_headers = Vec::with_capacity(header.program_header_n_entries as usize);
 
         for program_header_idx in 0..header.program_header_n_entries {
-            let base_offset = header.program_header_offset.to_usize();
+            let base_offset = header.program_header_offset.to_usize()?;
             let relative_offset = program_header_idx as usize * header.program_header_entry_size as usize;
 
             let bytes = &inp[base_offset + relative_offset..];
@@ -65,7 +65,7 @@ impl <B: ElfBitwidth> Elf<B> {
         // Read section headers
         let mut section_headers = Vec::with_capacity(header.section_header_n_entries as usize);
         for section_header_idx in 0..header.section_header_n_entries {
-            let base_offset = header.section_header_offset.to_usize();
+            let base_offset = header.section_header_offset.to_usize()?;
             let relative_offset = section_header_idx as usize * header.section_header_entry_size as usize;
 
             let bytes = &inp[base_offset + relative_offset..];
@@ -102,16 +102,16 @@ impl <B: ElfBitwidth> Elf<B> {
 
         let symtab_header = &self.section_headers[symtab_index];
 
-        if symtab_header.size.to_usize() % self.symtab_entry_size() != 0 {
+        if symtab_header.size.to_usize()? % self.symtab_entry_size() != 0 {
             eprintln!("Error: Symbol table size is not a multiple of {}!", self.symtab_entry_size());
         }
 
-        let n_symbol_tables = symtab_header.size.to_usize() / self.symtab_entry_size();
+        let n_symbol_tables = symtab_header.size.to_usize()? / self.symtab_entry_size();
 
         let mut symbol_tables = Vec::with_capacity(n_symbol_tables);
 
         for symbol_table_idx in 0..n_symbol_tables {
-            let base_offset = symtab_header.file_offset.to_usize();
+            let base_offset = symtab_header.file_offset.to_usize()?;
             let relative_offset = symbol_table_idx * self.symtab_entry_size();
 
             let bytes = &inp[base_offset + relative_offset..];
