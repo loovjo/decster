@@ -97,14 +97,9 @@ impl <B: ElfBitwidth> Elf<B> {
         2 * ptr_size + 8
     }
 
-    pub fn symbols(&self, inp: &mut ParsableFile<'_>) -> Result<Option<Vec<Symbol<B>>>, ElfParseError> {
-        let symtab_index = if let Some(stidx) = self.symtab_index() {
-            stidx
-        } else {
-            return Ok(None);
-        };
-
+    pub fn symbols(&self, inp: &mut ParsableFile<'_>, symtab_index: usize) -> Result<Vec<Symbol<B>>, ElfParseError> {
         let symtab_header = &self.section_headers[symtab_index];
+        assert!(symtab_header.type_ == SectionHeaderType::SymTab || symtab_header.type_ == SectionHeaderType::DynSym);
 
         if symtab_header.size.to_usize()? % self.symtab_entry_size() != 0 {
             eprintln!("Error: Symbol table size is not a multiple of {}!", self.symtab_entry_size());
@@ -123,7 +118,7 @@ impl <B: ElfBitwidth> Elf<B> {
             symbol_tables.push(symbol_table);
         }
 
-        Ok(Some(symbol_tables))
+        Ok(symbol_tables)
     }
 
     // Maybe we should make this function return the sections?

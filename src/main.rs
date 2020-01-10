@@ -64,11 +64,13 @@ fn handle_elf_64bit(mut contents: ParsableFile<'_>) -> Result<impl common::Parse
 
     }
 
-    match elf.symbols(&mut contents)? {
-        Some(symbols) => {
+    match elf.symtab_index() {
+        Some(idx) => {
+            println!("Found strtab at 0x{:x}", idx);
+            let symbols = elf.symbols(&mut contents, idx)?;
             for (i, symbol) in symbols.iter().enumerate() {
                 println!("Symbol 0x{:X}: {:X?}", i, symbol);
-                println!("Name: {:?}", symbol.get_name(&mut contents, &elf)?.map(String::from_utf8_lossy));
+                println!("Name: {:?}", symbol.get_name(&mut contents, &elf, &elf.section_headers[idx])?.map(String::from_utf8_lossy));
                 println!();
             }
         }

@@ -6,6 +6,7 @@ use crate::parsable_file::ParsableFile;
 
 use super::elf_bitwidth::ElfBitwidth;
 use super::ElfParseError;
+use super::SectionHeader;
 use super::Elf;
 
 #[derive(Debug, Clone)]
@@ -70,20 +71,8 @@ impl <B: ElfBitwidth> Symbol<B> {
         }
     }
 
-    pub fn get_name<'a>(&self, bytes: &mut ParsableFile<'a>, elf: &Elf<B>) -> Result<Option<&'a [u8]>, ElfParseError> {
-        let mut strtab_header = None;
-        for section_header in &elf.section_headers {
-            let name = section_header.get_name(bytes, elf)?;
-            if name == b".strtab" {
-                strtab_header = Some(section_header);
-            }
-        }
-
-        let strtab_header = if let Some(strtab_header) = strtab_header {
-            strtab_header
-        } else {
-            return Ok(None);
-        };
+    pub fn get_name<'a>(&self, bytes: &mut ParsableFile<'a>, elf: &Elf<B>, symbol_table: &SectionHeader<B>) -> Result<Option<&'a [u8]>, ElfParseError> {
+        let strtab_header = &elf.section_headers[symbol_table.link];
 
         let strtab = strtab_header.get_content(bytes)?;
         let name_start = &strtab[self.name_strtab_offset..];
