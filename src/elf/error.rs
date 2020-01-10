@@ -8,6 +8,7 @@ pub enum ElfParseError {
     WrongEndianness(u8),
     InvalidRelocationTableSize(usize), // Index of relocation table
     InvalidRelocationEntrySize(usize, usize), // Index of relocation table, index of relocation entry in table
+    InvalidSymbolReference(usize), // Index of symbol
     UnknownOsABI([u8; 1]),
     UnknownInstructionSet(u16),
     UnknownObjectType(u16),

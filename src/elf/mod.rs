@@ -131,35 +131,33 @@ impl <B: ElfBitwidth> Elf<B> {
             .collect()
     }
 
-    pub fn relocations(&self, inp: &mut ParsableFile<'_>) -> Result<Vec<Relocation<B>>, ElfParseError> {
+    pub fn relocations(&self, inp: &mut ParsableFile<'_>, reloc_table_idx: usize) -> Result<Vec<Relocation<B>>, ElfParseError> {
         let mut relocs = Vec::new();
 
-        for reloc_table_idx in self.reloc_tables_inds() {
-            let reloc_table = &self.section_headers[reloc_table_idx];
+        let reloc_table = &self.section_headers[reloc_table_idx];
 
-            let has_addend = match reloc_table.type_ {
-                SectionHeaderType::Rel => false,
-                SectionHeaderType::Rela => true,
-                _ => unreachable!(),
-            };
+        let has_addend = match reloc_table.type_ {
+            SectionHeaderType::Rel => false,
+            SectionHeaderType::Rela => true,
+            _ => unreachable!(),
+        };
 
-            if reloc_table.size.to_usize()? % reloc_table.entry_size.to_usize()? != 0 {
-                return Err(ElfParseError::InvalidRelocationTableSize(reloc_table_idx));
+        if reloc_table.size.to_usize()? % reloc_table.entry_size.to_usize()? != 0 {
+            return Err(ElfParseError::InvalidRelocationTableSize(reloc_table_idx));
+        }
+
+        let mut inp_for_reloc = inp.clone();
+        inp_for_reloc.move_to(reloc_table.file_offset.to_usize()?);
+
+        for reloc_entry_idx in 0..reloc_table.size.to_usize()? / reloc_table.entry_size.to_usize()? {
+            let ptr_before = inp_for_reloc.get_cursor();
+            let reloc = Relocation::parse(&mut inp_for_reloc, self.header.endianness, has_addend)?;
+            let delta = inp_for_reloc.get_cursor() - ptr_before;
+
+            if delta != reloc_table.entry_size.to_usize()? {
+                return Err(ElfParseError::InvalidRelocationEntrySize(reloc_table_idx, reloc_entry_idx));
             }
-
-            let mut inp_for_reloc = inp.clone();
-            inp_for_reloc.move_to(reloc_table.file_offset.to_usize()?);
-
-            for reloc_entry_idx in 0..reloc_table.size.to_usize()? / reloc_table.entry_size.to_usize()? {
-                let ptr_before = inp_for_reloc.get_cursor();
-                let reloc = Relocation::parse(&mut inp_for_reloc, self.header.endianness, has_addend)?;
-                let delta = inp_for_reloc.get_cursor() - ptr_before;
-
-                if delta != reloc_table.entry_size.to_usize()? {
-                    return Err(ElfParseError::InvalidRelocationEntrySize(reloc_table_idx, reloc_entry_idx));
-                }
-                relocs.push(reloc);
-            }
+            relocs.push(reloc);
         }
 
         Ok(relocs)

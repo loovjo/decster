@@ -55,7 +55,7 @@ fn handle_elf_64bit(mut contents: ParsableFile<'_>) -> Result<impl common::Parse
     println!("Parsed elf: {:#X?}", elf);
 
     for (i, section_header) in elf.section_headers.iter().enumerate() {
-        println!("Section header #{}: {:X?}", i, section_header);
+        println!("Section header #{:X}: {:X?}", i, section_header);
         println!("Name: {:?}", String::from_utf8_lossy(section_header.get_name(&mut contents, &elf)?));
         if section_header.size < 32 {
             println!("Content: {:?}", String::from_utf8_lossy(section_header.get_content(&mut contents)?));
@@ -79,8 +79,20 @@ fn handle_elf_64bit(mut contents: ParsableFile<'_>) -> Result<impl common::Parse
         }
     }
 
-    for relocation in elf.relocations(&mut contents)? {
-        println!("Relocation: {:X?}", relocation);
+    for reloc_table_idx in elf.reloc_tables_inds() {
+        println!("---\n");
+
+        let table = &elf.section_headers[reloc_table_idx];
+        println!("Found relocation table #0x{:X}: {:?}", reloc_table_idx, String::from_utf8_lossy(table.get_name(&mut contents, &elf)?));
+
+        let relocations = elf.relocations(&mut contents, reloc_table_idx)?;
+        for relocation in relocations {
+            println!("Relocation: {:X?}", relocation);
+            let symbol = relocation.get_symbol(&mut contents, &elf, &elf.section_headers[reloc_table_idx])?;
+            println!("Name from symbol: {:?}", symbol.get_name(&mut contents, &elf, &elf.section_headers[table.link])?.map(String::from_utf8_lossy));
+
+            println!();
+        }
     }
 
     Ok(elf)
