@@ -19,6 +19,8 @@ pub struct SectionHeader<B: ElfBitwidth> {
     pub virtual_address: <B as Bitwidth>::Ptr,
     pub file_offset: <B as Bitwidth>::Ptr,
     pub size: <B as Bitwidth>::Ptr,
+    pub link: u32,
+    pub info: u32,
     // TODO: Maybe add link, info, align
     pub entry_size: <B as Bitwidth>::Ptr,
 }
@@ -38,11 +40,9 @@ impl <B: ElfBitwidth> SectionHeader<B> {
 
         let size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
-        // Skip sh_link
-        inp.skip_n_bytes(4)?;
+        let link = endianness.read_u32(inp)?;
 
-        // Skip sh_info
-        inp.skip_n_bytes(4)?;
+        let info = endianness.read_u32(inp)?;
 
         // Skip sh_addralign
         inp.skip_n_bytes(<B as Bitwidth>::Ptr::N_BYTES)?;
@@ -57,6 +57,8 @@ impl <B: ElfBitwidth> SectionHeader<B> {
             virtual_address,
             file_offset,
             size,
+            link,
+            info,
             entry_size,
         })
     }
