@@ -19,7 +19,8 @@ pub struct SectionHeader<B: ElfBitwidth> {
     pub virtual_address: <B as Bitwidth>::Ptr,
     pub file_offset: <B as Bitwidth>::Ptr,
     pub size: <B as Bitwidth>::Ptr,
-    // TODO: Maybe add link, info, align, entsize
+    // TODO: Maybe add link, info, align
+    pub entry_size: <B as Bitwidth>::Ptr,
 }
 
 impl <B: ElfBitwidth> SectionHeader<B> {
@@ -47,7 +48,7 @@ impl <B: ElfBitwidth> SectionHeader<B> {
         inp.skip_n_bytes(<B as Bitwidth>::Ptr::N_BYTES)?;
 
         // Skip sh_entsize
-        inp.skip_n_bytes(<B as Bitwidth>::Ptr::N_BYTES)?;
+        let entry_size = <B as Bitwidth>::Ptr::read(endianness, inp)?;
 
         Ok(SectionHeader {
             _bitwidth: PhantomData,
@@ -56,6 +57,7 @@ impl <B: ElfBitwidth> SectionHeader<B> {
             virtual_address,
             file_offset,
             size,
+            entry_size,
         })
     }
 

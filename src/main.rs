@@ -66,8 +66,8 @@ fn handle_elf_64bit(mut contents: ParsableFile<'_>) -> Result<impl common::Parse
 
     match elf.symbols(&mut contents)? {
         Some(symbols) => {
-            for symbol in symbols {
-                println!("Symbol: {:X?}", symbol);
+            for (i, symbol) in symbols.iter().enumerate() {
+                println!("Symbol 0x{:X}: {:X?}", i, symbol);
                 println!("Name: {:?}", symbol.get_name(&mut contents, &elf)?.map(String::from_utf8_lossy));
                 println!();
             }
@@ -77,9 +77,9 @@ fn handle_elf_64bit(mut contents: ParsableFile<'_>) -> Result<impl common::Parse
         }
     }
 
-    // for relocation in elf.relocations()? {
-    //     println!("Relocation: {:?}", relocation);
-    // }
+    for relocation in elf.relocations(&mut contents)? {
+        println!("Relocation: {:X?}", relocation);
+    }
 
     Ok(elf)
 }

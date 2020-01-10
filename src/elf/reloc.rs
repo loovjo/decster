@@ -18,7 +18,6 @@ pub struct Relocation<B: ElfBitwidth> {
 }
 
 impl <B: ElfBitwidth> Relocation<B> {
-
     #[allow(unused)]
     pub fn parse(inp: &mut ParsableFile<'_>, endianness: Endianness, has_addend: bool) -> Result<Self, ElfParseError> {
         let virtual_address = <B as Bitwidth>::Ptr::read(endianness, inp)?;
